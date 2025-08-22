@@ -4,6 +4,7 @@ local StarterGui = Instance.new("ScreenGui")
 StarterGui.Name = "ChoiceGui"
 StarterGui.ResetOnSpawn = false
 StarterGui.Parent = player:WaitForChild("PlayerGui")
+StarterGui.Draggable = true
 
 local Frame = Instance.new("Frame")
 Frame.Size = UDim2.new(0, 200, 0, 120)
@@ -81,7 +82,6 @@ local function TeleportBase()
 end
 
 
---// Anti-Steal
 local function PerformAntiSteal()
     if antiStealMode == "Kick" then
         player:Kick("Anti-Steal: Someone entered your base.")
@@ -91,9 +91,11 @@ local function PerformAntiSteal()
                 game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
             )
         end)
+
         if success and servers and servers.data then
+            local currentJobId = game.JobId
             for _, srv in ipairs(servers.data) do
-                if srv.playing < srv.maxPlayers then
+                if srv.playing < srv.maxPlayers and srv.id ~= currentJobId then
                     TeleportService:TeleportToPlaceInstance(game.PlaceId, srv.id, player)
                     break
                 end
@@ -125,7 +127,16 @@ local function EnableAntiSteal(state)
         return
     end
 
-    baseConnection = myBase.Touched:Connect(function(hit)
+    -- create a smaller "detection zone" inside the baseplate
+    local zone = Instance.new("Part")
+    zone.Size = myBase.Size - Vector3.new(3, 0, 3) -- shrink by 2 studs on X and Z
+    zone.CFrame = myBase.CFrame + Vector3.new(0, 0.5, 0) -- slightly above the base
+    zone.Transparency = 1
+    zone.Anchored = true
+    zone.CanCollide = false
+    zone.Parent = workspace
+
+    baseConnection = zone.Touched:Connect(function(hit)
         local char = hit:FindFirstAncestorWhichIsA("Model")
         local plr = char and game.Players:GetPlayerFromCharacter(char)
         if plr and plr ~= player and IsEnemy(plr) then
@@ -133,7 +144,6 @@ local function EnableAntiSteal(state)
         end
     end)
 end
-
 
 --// Highlights
 local highlights = {}
@@ -180,9 +190,9 @@ local function LoadRayfield()
     TeleportTab:CreateButton({Name = "Teleport To My Base", Callback = TeleportBase})
 
     local PlayersTab = Window:CreateTab("Players", 4483362458)
-    PlayersTab:CreateToggle({Name = "Toggle Player ESP", CurrentValue = false, Callback = ToggleHighlights})
+    PlayersTab:CreateToggle({Name = "Player ESP", CurrentValue = false, Callback = ToggleHighlights})
     PlayersTab:CreateToggle({
-        Name = "Treat Friends as Safe",
+        Name = "Friend blocked?",
         CurrentValue = true,
         Callback = function(val) treatFriendsAsSafe = val end
     })
@@ -202,7 +212,7 @@ local function LoadRayfield()
     local SecurityTab = Window:CreateTab("Security", 4483362458)
     SecurityTab:CreateDropdown({
         Name = "Anti-Steal Mode",
-        Options = {"Kick", "Server Hop (NOT WORKING RN)"},
+        Options = {"Kick", "Server Hop (BEING TESTED)"},
         CurrentOption = "Kick",
         Callback = function(opt) antiStealMode = opt end
     })
